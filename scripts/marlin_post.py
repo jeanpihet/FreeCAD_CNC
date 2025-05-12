@@ -5,6 +5,8 @@
 # *   (c) Gauthier Briere - 2018, 2019                                        *
 # *   (c) Schildkroet - 2019-2020                                             *
 # *   (c) Gary L Hasson - 2020                                                *
+# *   (c) Jean Pihet - 2022: Adapted to Kosy A3 CNC machine                   *
+# *                    2025: Update to FreeCAD 1.0                            *
 # *                                                                           *
 # *   This file is part of the FreeCAD CAx development system.                *
 # *                                                                           *
@@ -37,7 +39,7 @@ import Path.Base.Util as PathUtil
 import Path.Post.Utils as PostUtils
 import PathScripts.PathUtils as PathUtils
 
-Revised = "2020-11-03"  # Revision date for this file.
+Revised = "2025-05-12"  # Revision date for this file.
 
 # *****************************************************************************
 # *   Due to the fundamentals of the FreeCAD pre-processor,                   *
@@ -50,7 +52,7 @@ Revised = "2020-11-03"  # Revision date for this file.
 
 
 TOOLTIP = """
-Generate g-code from a Path that is compatible with the Marlin controller.
+Generate g-code from a CNC Path that is compatible with the Marlin controller.
 import marlin_post
 marlin_post.export(object, "/path/to/file.nc")
 """
@@ -209,7 +211,7 @@ COMMAND_SPACE = " "
 CURRENT_X = None
 CURRENT_Y = None
 CURRENT_Z = None
-
+lastRapidRate = float(0.0)
 
 def processArguments(argstring):
     global OUTPUT_HEADER
@@ -334,7 +336,7 @@ def export(objectslist, filename, argstring):
     # Write the preamble:
     if OUTPUT_COMMENTS:
         gcode += linenumber() + "(Begin preamble)\n"
-    for line in PREAMBLE.splitlines(True):
+    for line in PREAMBLE.replace("\\n","\n").splitlines(True):
         gcode += linenumber() + line
 
     # Write these settings AFTER the preamble,
@@ -409,7 +411,7 @@ def export(objectslist, filename, argstring):
         gcode += linenumber() + "(Block-enable: 1)\n"
     if OUTPUT_COMMENTS:
         gcode += linenumber() + "(Begin postamble)\n"
-    for line in POSTAMBLE.splitlines(True):
+    for line in POSTAMBLE.replace("\\n","\n").splitlines(True):
         gcode += linenumber() + line
 
     # Optionally add a final XYZ position to the end of the gcode:
@@ -485,6 +487,7 @@ def parse(pathobj):
     global CURRENT_X
     global CURRENT_Y
     global CURRENT_Z
+    global lastRapidRate
 
     out = ""
     lastcommand = None
@@ -553,6 +556,12 @@ def parse(pathobj):
                                         precision_string,
                                     )
                                 )
+                        else:
+                            feedRate = Units.Quantity(c.Parameters["F"], FreeCAD.Units.Velocity)
+                            if feedRate.getValueAs(UNIT_FEED_FORMAT) > 0.0:
+                                lastRapidRate =  float(
+                                    feedRate.getValueAs(UNIT_FEED_FORMAT))
+                                outlist.append(param + format(lastRapidRate, precision_string))
                     elif param in ["T", "H", "D", "S", "P", "L"]:
                         outlist.append(param + str(c.Parameters[param]))
                     elif param in ["A", "B", "C"]:
@@ -563,6 +572,11 @@ def parse(pathobj):
                         outlist.append(
                             param + format(float(pos.getValueAs(UNIT_FORMAT)), precision_string)
                         )
+            # If "F" is not mentionned in rapid moves, add it
+            if command in RAPID_MOVES and "F" not in c.Parameters:
+                if lastRapidRate > 0.0:
+                    outlist.append("F" + format(lastRapidRate,
+                        precision_string))
 
             # Store the latest command:
             lastcommand = command
@@ -694,7 +708,10 @@ def drill_translate(outlist, cmd, params):
     # Z motion nested functions:
     def rapid_Z_to(new_Z):
         Drill.gcode += linenumber() + "G0 Z"
-        Drill.gcode += format(float(new_Z.getValueAs(UNIT_FORMAT)), strFormat) + "\n"
+        Drill.gcode += format(
+            float(new_Z.getValueAs(UNIT_FORMAT)), strFormat) + " F"
+        Drill.gcode += format(
+            float(drill_F.getValueAs(UNIT_FEED_FORMAT)), ".2f") + "\n"
 
     def feed_Z_to(new_Z):
         Drill.gcode += linenumber() + "G1 Z"
@@ -708,7 +725,8 @@ def drill_translate(outlist, cmd, params):
     # Rapid to hole position XY:
     Drill.gcode += linenumber() + "G0 X"
     Drill.gcode += format(float(drill_X.getValueAs(UNIT_FORMAT)), strFormat) + " Y"
-    Drill.gcode += format(float(drill_Y.getValueAs(UNIT_FORMAT)), strFormat) + "\n"
+    Drill.gcode += format(float(drill_Y.getValueAs(UNIT_FORMAT)), strFormat) + " F"
+    Drill.gcode += format(float(drill_F.getValueAs(UNIT_FEED_FORMAT)), ".2f") + "\n"
 
     # Rapid to R:
     rapid_Z_to(drill_R)
