@@ -1,2 +1,120 @@
 # FreeCAD_CNC
 Scripts and documentation about doing open source CNC with FreeCAD
+
+## Install
+Use a precompiled version of freecad from github.
+https://github.com/FreeCAD/FreeCAD/releases
+
+## Engrave from sketch
+
+0. Create SVG from a sketch (Inkscape) ! Close paths
+
+1. New project. Part Design-> Create body
+
+2. Import SVG in Freecad, as geometry
+
+3. Extrude the SVG. Part->Extrude 0.2mm. Z axis, Symmetric, Create Solid
+
+4. In case of embedded path (paths in paths), use Part->Boolean to keep only the engraving
+
+5. Create a stock part (cube):
+   . Part Design-> New sketch; draw rectangle
+   . Pad. ! Reverse = true to go -Z
+
+6. Move the parts below the Z axis, check that parts are aligned ok on Z = 0
+
+7. Extract the engraving from the stock: Part->Difference. The result is the stock with the engraving solid substracted
+
+8. Select engraving solid
+
+9. Path->Create, check that the engraving solid is selected
+
+10. Add tool from the Toolbit dock; check travel speed and spindle speed (!=0 for the spindle to be turnede on), etc.
+
+11. In Job, check parameters in SetupSheet: Final Depth = -0.2mm; Start Depth = 0; Step Down = 0.1mm
+
+12. Path->3D Pocket, check depths, finish step, heights
+
+    ! Finish depth != 0, = 10nm from the final depth (?)
+    
+    ! For round holes, use Spiral pattern
+
+14. Add pre and post code in G-code to set new 0 etc. -> cf. Marlin post processor.
+
+15. Marlin post processor
+- Copy marlin_post.py in ~/.FreeCAD/Macro/
+
+- marlin_post.py is edited with:
+  
+  . 'POSTAMBLE.replace("\\n","\n").splitlines(True):' for PREAMBLE and POSTAMBLE.
+ 
+  . UNIT_FEED_FORMAT = 'mm/min'
+ 
+  . changes for rapid rate (G0)
+
+- Default post processor settings
+
+  . Edit -> Preferences -> Path -> Job Preferences -> General
+  
+   . Path: /home/def/.FreeCAD/Macro/
+  
+  . Edit -> Preferences -> Path -> Job Preferences -> Post Processor
+  
+   . Default post processor: marlin
+
+   . Default Arguments
+```
+ --preamble "G90\nG21\nG92 X0 Y0 Z0 (This is your new home)\nG0 F800 Z3\nM0 Originpart Ok\n" --postamble "G0 F800 Z5\nM5 (Spindle off)\nG0 F800 X0 Y0\nM400 (Finish moves)\nM300 S1000 P2000 (Beep)\nG17 G90\n"
+```
+
+15. Path->Post process to save the G-code
+
+16. Start CNC
+
+    . position part
+
+    . set tool to piece reference (this will be the new origin after G92)
+
+    . launch gcode from SD card
+
+## G-code details
+preamble
+```
+(*********** set 0, move spindle up before turning it on ***********)
+G92 X0 Y0 Z0 (This is your new home)
+G0 F800 Z3
+M0 Originpart Ok
+```
+
+postamble
+```
+(*********** spindle off, reset to 0, move spindle up to remove the part ***********)
+G0 F800 Z5
+M5 (Spindle off)
+G0 F800 X0 Y0
+M400 (Finish moves)
+M300 S1000 P2000 (Beep)
+```
+
+## Tools settings for material
+
+### Plexi
+
+- Endmill 3mm bit
+- Fast 840 mm/min = 14 mm/s
+- Normal 240 mm/min = 4 mm/s
+- Step down 1-1.25 mm
+
+### Zinc
+
+- Engrave 0.1mm bit
+- Fast 840 mm/min = 14 mm/s
+- Normal 240 mm/min = 4 mm/s
+- One pass 0.10 - 1 mm
+
+### Brass
+
+- Engrave 0.1mm bit
+- Fast 800 mm/min = 13.33 mm/s
+- Normal 100 mm/min = 1.66 mm/s
+- Step down 0.06 x2 + finish 0.03 = 0.15mm
