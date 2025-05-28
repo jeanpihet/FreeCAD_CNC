@@ -47,9 +47,9 @@ Version >= 1.0 is required for stability and availability of the CAM module.
 
 3. Import SVG in Freecad, from the Draft module, as geometry
 
-4. From the Draft module, convert the path to sketch with Modification -> Draft to sketch
+4. From the Draft module, convert the path to sketch with Modification -> Draft to sketch. The original paths can be deleted
 
-5. Extrude the SVG. Part->Extrude 0.2mm. Z axis, Symmetric, Create Solid
+5. Extrude the sketch. Part->Extrude 0.2mm. Z axis, Symmetric, Create Solid, Reverse
 
 6. In case of embedded path (paths in paths), use Part->Boolean to keep only the engraving
 
