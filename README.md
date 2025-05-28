@@ -22,7 +22,7 @@ Version >= 1.0 is required for stability and availability of the CAM module.
 
   . Edit -> Preferences -> CAM -> Job Preferences -> General
   
-   . Path: /home/def/.FreeCAD/Macro/
+   . Path: ~/.FreeCAD/Macro/
   
   . Edit -> Preferences -> CAM -> Job Preferences -> Post Processor
   
